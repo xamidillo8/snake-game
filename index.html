@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Snake o'yini — HTML/CSS/JS</title>
+  <style>
+    :root{
+      --bg:#0f172a;
+      --panel:#0b1220;
+      --accent:#10b981;
+      --danger:#ef4444;
+      --muted:#94a3b8;
+      --glass: rgba(255,255,255,0.04);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background:linear-gradient(180deg,#071126 0%, #08122a 60%);
+      color:#e6eef8;
+      padding:20px;
+    }
+
+    .container{
+      width:100%;
+      max-width:920px;
+      display:grid;
+      grid-template-columns: 1fr 320px;
+      gap:20px;
+      align-items:start;
+    }
+
+    /* Left: Game */
+    .game-card{
+      background:var(--panel);
+      border-radius:16px;
+      padding:18px;
+      box-shadow: 0 8px 30px rgba(2,6,23,0.6);
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .title{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+    }
+    .title h1{margin:0;font-size:18px;}
+    .meta{font-size:13px;color:var(--muted);}
+
+    /* canvas wrapper */
+    .canvas-wrap{
+      background:var(--glass);
+      border-radius:12px;
+      padding:14px;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      position: relative; /* start-overlay uchun kerak */
+    }
+    canvas{
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:8px;
+      width:100%; /* Canvas width to fill its container */
+      height:auto;
+      display:block;
+    }
+
+    /* Controls overlay for mobile */
+    .controls{
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      margin-top:8px;
+      user-select:none;
+    }
+    .btn{
+      padding:10px 12px;
+      border-radius:10px;
+      background:rgba(255,255,255,0.03);
+      border:1px solid rgba(255,255,255,0.03);
+      color:inherit;
+      font-weight:600;
+      cursor:pointer;
+      transition:transform .08s ease;
+      white-space: nowrap; /* Tugmalardagi matn bir qatorda qolishi uchun */
+    }
+    .btn:active{transform:translateY(1px)}
+
+    /* Right: scoreboard */
+    .side{
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:16px;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      min-height:200px;
+    }
+    .stat{display:flex;justify-content:space-between;gap:12px;padding:10px;border-radius:10px;background:rgba(255,255,255,0.01);}
+    .big{font-size:22px;font-weight:700;color:var(--accent)}
+    .small{font-size:13px;color:var(--muted)}
+
+    footer.note{font-size:13px;color:var(--muted);margin-top:12px}
+
+    /* responsive */
+    @media (max-width:900px){
+      .container{
+        grid-template-columns:1fr;
+        padding:0;
+        gap: 10px; /* Mobil rejimda konteyner elementlari orasidagi bo'shliqni kamaytirish */
+      }
+      body { padding: 10px; } /* Umumiy body paddingini kamaytirish */
+    }
+
+    /* on-screen directional pad for small screens */
+    #mobileControls {
+        display: none; /* Desktopda yashirish */
+        padding: 8px 0; /* Yuqori va pastki qismda padding berish */
+    }
+    .dpad{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:8px;
+      justify-content:center;
+      align-items:center;
+      width: 100%;
+      max-width: 200px; /* D-pad ning maksimal kengligini cheklash */
+      margin: 0 auto;
+    }
+    .dpad .empty{width:100%;height:100%;}
+    .dpad button{
+      width:100%;
+      padding-top: 100%; /* Tugmalarni kvadrat qilish */
+      position: relative;
+      border-radius:12px;border:none;background:rgba(255,255,255,0.03);
+      color:inherit;font-weight:700;font-size:18px;cursor:pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .dpad button span {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    /* Mobile specific adjustments (700px va undan kichikroq ekranlar uchun) */
+    @media (max-width:700px){
+      .game-card{ padding:12px; }
+      .side{ display:none; } /* Mobil ekranlarda sidebar'ni yashirish */
+      .canvas-wrap{ padding:8px; }
+      .title h1{font-size:16px;}
+      .title .btn{padding:8px 10px; font-size:14px;}
+      .meta{font-size:12px;}
+      .controls{
+          flex-wrap: wrap; /* Tugmalar kichik ekranlarda keyingi qatorga o'tishi uchun */
+          justify-content: center; /* Tugmalarni markazga joylash */
+          gap: 10px; /* Tugmalar orasidagi bo'shliqni oshirish */
+      }
+      .controls > div {
+          flex: 1 1 auto; /* Har bir elementning kengligini avtomatik sozlash */
+          text-align: center;
+          min-width: 100px; /* Minimal kenglik berish */
+      }
+      #mobileControls {
+          display: block; /* Mobil ekranlarda D-padni ko'rsatish */
+      }
+      #desktopControls {
+          display: none; /* Mobil ekranlarda desktop boshqaruvlarini yashirish */
+      }
+    }
+
+    /* Start button styling */
+    .start-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+        border-radius: 12px; /* canvas-wrap border-radiusiga moslash */
+        flex-direction: column; /* Ikkita tugmani vertikal joylash */
+        gap: 15px; /* Tugmalar orasidagi bo'shliq */
+        text-align: center;
+    }
+
+    .start-button, .game-over-button {
+        padding: 15px 30px;
+        font-size: 24px;
+        font-weight: bold;
+        color: var(--accent);
+        background: rgba(255, 255, 255, 0.1);
+        border: 2px solid var(--accent);
+        border-radius: 10px;
+        cursor: pointer;
+        transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+        text-decoration: none; /* Link bo'lsa, pastki chiziqni olib tashlash */
+        display: inline-block; /* Kenglikni kontentga moslash */
+    }
+
+    .start-button:hover, .game-over-button:hover {
+        background-color: var(--accent);
+        color: var(--panel);
+        border-color: var(--accent);
+    }
+
+    /* Game Over specific styles */
+    .game-over-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9); /* Biroz quyuqroq fon */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        gap: 25px; /* Tugmalar va matn orasidagi bo'shliq */
+        z-index: 10;
+        border-radius: 12px;
+        color: var(--danger); /* Qizil rangdagi xabar */
+        font-size: 3em; /* Kattaroq shrift */
+        font-weight: bold;
+        text-shadow: 0 0 10px rgba(239, 68, 68, 0.7); /* Yorqin soya */
+    }
+
+    .game-over-overlay h2 {
+        margin: 0;
+        font-size: 0.9em; /* "Yutqazdingiz!" matni uchun */
+        color: var(--danger);
+    }
+
+    .game-over-overlay .final-score {
+        font-size: 0.5em; /* Yakuniy ball uchun */
+        color: #fff;
+        margin-top: -15px; /* Matnni biroz yuqoriga surish */
+    }
+
+    .game-over-button {
+        color: var(--danger); /* Qayta o'ynash tugmasi rangini o'zgartirish */
+        border-color: var(--danger);
+        background: rgba(239, 68, 68, 0.1);
+        font-size: 0.4em;
+    }
+
+    .game-over-button:hover {
+        background-color: var(--danger);
+        color: var(--panel);
+        border-color: var(--danger);
+    }
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="game-card" role="region" aria-label="Snake o'yini">
+      <div class="title">
+        <div>
+          <h1>Snake — O'yin</h1>
+          <div class="meta">Strelka yoki WASD bilan boshqarish. Mobil uchun tugmalar mavjud.</div>
+        </div>
+        <div>
+          <button id="restartBtn" class="btn" title="Qayta boshlash">Qayta</button>
+          <button id="pauseBtn" class="btn" title="To'xtatish/ davom ettirish">To'xtat</button>
+        </div>
+      </div>
+
+      <div class="canvas-wrap">
+        <canvas id="game"></canvas>
+        <div id="startOverlay" class="start-overlay">
+            <button id="startButton" class="start-button">Boshlash</button>
+        </div>
+        <!-- Game Over overlay -->
+        <div id="gameOverOverlay" class="game-over-overlay" style="display:none;">
+            <h2>Yutqazdingiz!</h2>
+            <div class="final-score">Ball: <span id="finalScore">0</span></div>
+            <button id="playAgainButton" class="game-over-button">Qaytadan o'ynash</button>
+        </div>
+      </div>
+
+      <!-- Desktop controls (will be hidden on mobile) -->
+      <div class="controls" id="desktopControls">
+        <div class="small">Daraja: <span id="level">1</span></div>
+        <div class="small">Tezlik: <span id="speedLabel">Normal</span></div>
+        <div class="small">High score: <span id="hs">0</span></div>
+      </div>
+
+      <!-- Mobile D-pad and simplified stats (will be hidden on desktop) -->
+      <div id="mobileControls">
+        <div class="dpad" id="dpad">
+          <div class="empty"></div>
+          <button data-dir="up"><span>↑</span></button>
+          <div class="empty"></div>
+
+          <button data-dir="left"><span>←</span></button>
+          <div class="empty"></div>
+          <button data-dir="right"><span>→</span></button>
+
+          <div class="empty"></div>
+          <button data-dir="down"><span>↓</span></button>
+          <div class="empty"></div>
+        </div>
+        <div class="controls" style="margin-top: 15px;">
+          <div class="small">Ball: <span id="score_mobile">0</span></div>
+          <div class="small">HS: <span id="hs_mobile">0</span></div>
+          <div class="small">Tezlik: <span id="speedLabel_mobile">Normal</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <aside class="side" aria-label="Statistika">
+      <div class="stat">
+        <div>Ball</div>
+        <div class="big" id="score">0</div>
+      </div>
+      <div class="stat">
+        <div>O'liklar</div>
+        <div class="big" id="deaths">0</div>
+      </div>
+      <div class="stat">
+        <div>O'yin holati</div>
+        <div id="state" class="small">Tayyor</div>
+      </div>
+
+      <div>
+        <div style="font-weight:700;margin-bottom:6px">Qoʻshimcha</div>
+        <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:13px">
+          <li>"Boshlash" tugmasini bosib o'yinni boshlang</li>
+          <li>Uzoq saqlash: High score localStorage orqali saqlanadi</li>
+          <li>Responsive — mobil va desktop</li>
+        </ul>
+      </div>
+
+      <div class="note">Yordam: ↑ ↓ ← → yoki W A S D — harakat.</div>
+    </aside>
+  </div>
+
+  <script>
+    /* --- O'yin konfiguratsiyasi --- */
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const startOverlay = document.getElementById('startOverlay');
+    const startButton = document.getElementById('startButton');
+    const gameOverOverlay = document.getElementById('gameOverOverlay'); // Game Over overlay
+    const playAgainButton = document.getElementById('playAgainButton'); // Qaytadan o'ynash tugmasi
+    const finalScoreEl = document.getElementById('finalScore'); // Yakuniy ball uchun element
+
+    // render o'lchamlari (grid asosida)
+    const GRID = 20; // tarmoqning hujayra o'lchami (px)
+    let COLS = 28;
+    let ROWS = 18;
+
+    // o'zgaruvchilar
+    let snake = [];
+    let dir = { x: 1, y: 0 };
+    let nextDir = { x: 1, y: 0 };
+    let food = null;
+    let score = 0;
+    let deaths = 0;
+    let speed = 8; // frames per second-ish
+    let lastTime = 0;
+    let elapsed = 0;
+    let running = false;
+    let paused = false;
+    let highScore = 0;
+    const SPEED_LABELS = {6:'Sekin',8:'Normal',12:'Tez',16:'Juda tez'};
+
+    // elementlar
+    const scoreEl = document.getElementById('score');
+    const hsEl = document.getElementById('hs');
+    const deathsEl = document.getElementById('deaths');
+    const stateEl = document.getElementById('state');
+    const levelEl = document.getElementById('level');
+    const speedLabelEl = document.getElementById('speedLabel');
+    // Mobil uchun yangi elementlar
+    const scoreMobileEl = document.getElementById('score_mobile');
+    const hsMobileEl = document.getElementById('hs_mobile');
+    const speedLabelMobileEl = document.getElementById('speedLabel_mobile');
+
+
+    // responsive canvas sizing
+    function resizeCanvas(){
+      const gameCard = document.querySelector('.game-card');
+      if (!gameCard) return; // gameCard mavjud emasligini tekshirish
+
+      // Canvas wrap ning ichki kengligini olish
+      const canvasWrap = document.querySelector('.canvas-wrap');
+      const wrapPadding = parseFloat(getComputedStyle(canvasWrap).paddingLeft) * 2;
+      const availableWidth = canvasWrap.clientWidth - wrapPadding;
+      
+      // Minimal va maksimal grid hajmini belgilash
+      const minCols = 10;
+      const maxCols = 36;
+      const aspectRatio = 16 / 10; // Keng tarqalgan aspect ratio (kenglik/balandlik)
+
+      // Mavjud kenglikka qarab ustunlar sonini hisoblash
+      COLS = Math.max(minCols, Math.min(maxCols, Math.floor(availableWidth / GRID)));
+      
+      // Ustunlar soniga qarab qatorlar sonini hisoblash, aspect ratioga rioya qilish
+      ROWS = Math.floor(COLS / aspectRatio);
+
+      // Minimal qatorlar sonini ta'minlash
+      const minRows = 8;
+      ROWS = Math.max(minRows, ROWS);
+
+      canvas.width = COLS * GRID;
+      canvas.height = ROWS * GRID;
+
+      // Ensure crisp rendering on high-DPI displays after resize
+      safeScale();
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas(); // Sahifa yuklanganda birinchi marta chaqirish
+
+    // init highscore
+    try {
+      highScore = parseInt(localStorage.getItem('snake_highscore') || '0',10);
+    } catch(e){ highScore = 0 }
+    hsEl.textContent = highScore;
+    hsMobileEl.textContent = highScore; // Mobil high score'ni ham yangilash
+
+    // random helper
+    function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+
+    // start/restart
+    function resetGame(){
+      snake = [];
+      const startLen = 4;
+      const startX = Math.floor(COLS/2);
+      const startY = Math.floor(ROWS/2);
+      for(let i=0;i<startLen;i++){
+        snake.push({ x: startX - i, y: startY });
+      }
+      dir = { x: 1, y: 0 };
+      nextDir = { x: 1, y: 0 };
+      placeFood();
+      score = 0;
+      // deaths = 0; // deaths count should persist unless explicitly reset
+      running = true;
+      paused = false;
+      speed = 8;
+      updateHUD();
+      stateEl.textContent = 'Oʻynash';
+      startOverlay.style.display = 'none'; // Hide start button when game starts
+      gameOverOverlay.style.display = 'none'; // "Game Over" ni yashirish
+    }
+
+    function placeFood(){
+      // find a free cell
+      let tries = 0;
+      while(true){
+        tries++;
+        const f = { x: randInt(0, COLS-1), y: randInt(0, ROWS-1) };
+        if(!snake.some(s => s.x===f.x && s.y===f.y)){
+          food = f;
+          return;
+        }
+        if(tries>200) { food = null; return; }
+      }
+    }
+
+    // draw
+    function draw(){
+      // background
+      ctx.fillStyle = '#071828';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+
+      // grid subtle
+      ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+      ctx.lineWidth = 1;
+      for(let x=0;x<canvas.width;x+=GRID){
+        ctx.beginPath(); ctx.moveTo(x+0.5,0); ctx.lineTo(x+0.5,canvas.height); ctx.stroke();
+      }
+      for(let y=0;y<canvas.height;y+=GRID){
+        ctx.beginPath(); ctx.moveTo(0,y+0.5); ctx.lineTo(canvas.width,y+0.5); ctx.stroke();
+      }
+
+      // draw food
+      if(food){
+        const cx = food.x*GRID, cy = food.y*GRID;
+        ctx.fillStyle = '#ef4444';
+        roundRect(ctx, cx+4, cy+4, GRID-8, GRID-8, 6);
+        ctx.fill();
+      }
+
+      // draw snake
+      for(let i=snake.length-1;i>=0;i--){
+        const s = snake[i];
+        const x = s.x*GRID, y = s.y*GRID;
+        if(i===0){
+          // head
+          ctx.fillStyle = '#10b981';
+          roundRect(ctx, x+1, y+1, GRID-2, GRID-2, 6);
+          ctx.fill();
+        } else {
+          // body gradient
+          const t = i / snake.length;
+          ctx.fillStyle = `rgba(16,185,129, ${0.2 + 0.6 * (1-t)})`;
+          roundRect(ctx, x+2, y+2, GRID-4, GRID-4, 5);
+          ctx.fill();
+        }
+      }
+    }
+
+    function roundRect(ctx,x,y,w,h,r){
+      ctx.beginPath();
+      ctx.moveTo(x+r, y);
+      ctx.arcTo(x+w, y, x+w, y+h, r);
+      ctx.arcTo(x+w, y+h, x, y+h, r);
+      ctx.arcTo(x, y+h, x, y, r);
+      ctx.arcTo(x, y, x+w, y, r);
+      ctx.closePath();
+    }
+
+    // game update
+    function update(){
+      // move
+      dir = nextDir;
+      const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+      // Wall collision (devorga urilsa o'lim)
+      if(head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS){
+          // o'ldi
+          deaths++;
+          stateEl.textContent = 'Oʻlim';
+          running = false;
+          finalScoreEl.textContent = score; // Yakuniy ballni ko'rsatish
+          gameOverOverlay.style.display = 'flex'; // "Game Over" ni ko'rsatish
+          // update highscore
+          if(score > highScore){
+            highScore = score;
+            try { localStorage.setItem('snake_highscore', highScore); } catch(e){}
+            hsEl.textContent = highScore;
+            hsMobileEl.textContent = highScore; // Mobil high score'ni ham yangilash
+          }
+          return;
+      }
+
+      // collision with self?
+      for(let i=0;i<snake.length;i++){
+        if(snake[i].x===head.x && snake[i].y===head.y){
+          // o'ldi
+          deaths++;
+          stateEl.textContent = 'Oʻlim';
+          running = false;
+          finalScoreEl.textContent = score; // Yakuniy ballni ko'rsatish
+          gameOverOverlay.style.display = 'flex'; // "Game Over" ni ko'rsatish
+          // update highscore
+          if(score > highScore){
+            highScore = score;
+            try { localStorage.setItem('snake_highscore', highScore); } catch(e){}
+            hsEl.textContent = highScore;
+            hsMobileEl.textContent = highScore; // Mobil high score'ni ham yangilash
+          }
+          return;
+        }
+      }
+
+      snake.unshift(head);
+
+      // eat?
+      if(food && head.x===food.x && head.y===food.y){
+        score++;
+        // increase speed slightly every few points
+        if(score % 4 === 0) speed = Math.min(20, speed + 1);
+        placeFood();
+      } else {
+        snake.pop();
+      }
+
+      // update HUD each frame change
+      updateHUD();
+    }
+
+    function updateHUD(){
+      scoreEl.textContent = score;
+      deathsEl.textContent = deaths;
+      levelEl.textContent = Math.floor(1 + score/5);
+      speedLabelEl.textContent = SPEED_LABELS[speed] || speed;
+      // Mobil elementlarni ham yangilash
+      scoreMobileEl.textContent = score;
+      hsMobileEl.textContent = highScore;
+      speedLabelMobileEl.textContent = SPEED_LABELS[speed] || speed;
+    }
+
+    // main loop
+    function loop(ts){
+      if(!lastTime) lastTime = ts;
+      const delta = ts - lastTime;
+      lastTime = ts;
+      if(!paused && running){
+        elapsed += delta;
+        const interval = 1000 / speed;
+        if(elapsed >= interval){
+          // step as many times as needed (avoid slow frames)
+          const steps = Math.floor(elapsed / interval);
+          elapsed -= steps * interval;
+          for(let i=0;i<steps;i++){
+            update();
+            if(!running) break;
+          }
+        }
+      }
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    // input handlers
+    function setDirection(dx,dy){
+      // prevent reversing
+      if(dx === -dir.x && dy === -dir.y) return;
+      nextDir = { x: dx, y: dy };
+    }
+    window.addEventListener('keydown', (e) => {
+      // O'yin boshlanmagan bo'lsa, faqat "space" yoki "r" tugmasini eshitish
+      if(!running && e.key !== ' ' && e.key !== 'r' && e.key !== 'R') {
+        // Agar Game Over overlay ko'rinib turgan bo'lsa, hech narsa qilmaslik
+        if (gameOverOverlay.style.display === 'flex') {
+          return;
+        }
+        return;
+      }
+
+      if(e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') setDirection(0,-1);
+      if(e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') setDirection(0,1);
+      if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') setDirection(-1,0);
+      if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') setDirection(1,0);
+      if(e.key === ' '){ // space to pause
+        e.preventDefault(); // Prevent scrolling on spacebar
+        togglePause();
+      }
+      if(e.key === 'r' || e.key === 'R'){ resetGame(); }
+    });
+
+    // mobile D-pad
+    document.getElementById('dpad').addEventListener('click', (ev)=>{
+      const btn = ev.target.closest('button[data-dir]');
+      if(!btn) return;
+      if(!running) return; // Only allow direction input if game is running
+      const dir = btn.dataset.dir;
+      if(dir==='up') setDirection(0,-1);
+      if(dir==='down') setDirection(0,1);
+      if(dir==='left') setDirection(-1,0);
+      if(dir==='right') setDirection(1,0);
+    });
+
+    // touch swipe for mobile
+    let touchStart = null;
+    canvas.addEventListener('touchstart', (e)=>{
+      if(e.touches.length===1){
+        touchStart = { x:e.touches[0].clientX, y:e.touches[0].clientY };
+      }
+    }, {passive:true});
+    canvas.addEventListener('touchend', (e)=>{
+      if(!touchStart) return;
+
+      const t = e.changedTouches[0];
+      const dx = t.clientX - touchStart.x;
+      const dy = t.clientY - touchStart.y;
+
+      const swipeThreshold = 30; // minimal swipe masofasi
+      const tapThreshold = 10; // minimal tap masofasi
+
+      if (Math.abs(dx) > swipeThreshold || Math.abs(dy) > swipeThreshold) {
+        // Swipe
+        if(Math.abs(dx) > Math.abs(dy)){
+          if(dx>0) setDirection(1,0); else setDirection(-1,0);
+        } else {
+          if(dy>0) setDirection(0,1); else setDirection(0,-1);
+        }
+      } else if (Math.abs(dx) < tapThreshold && Math.abs(dy) < tapThreshold) {
+        // Tap (agar swipe emas, ammo kichik siljish bo'lsa)
+        if (!running) {
+            startButton.click(); // Agar o'yin ishlamayotgan bo'lsa, Boshlash tugmasini bosish
+        } else {
+            togglePause(); // Agar o'yin ishlayotgan bo'lsa, pauza qilish
+        }
+      }
+      touchStart = null;
+    }, {passive:true});
+
+    // buttons
+    document.getElementById('restartBtn').addEventListener('click', (e)=>{
+      e.preventDefault();
+      resetGame();
+    });
+    document.getElementById('pauseBtn').addEventListener('click', (e)=>{
+      e.preventDefault();
+      togglePause();
+    });
+
+    // Start button logic
+    startButton.addEventListener('click', () => {
+        resetGame();
+    });
+
+    // Play Again button logic
+    playAgainButton.addEventListener('click', () => {
+        resetGame();
+    });
+
+    function togglePause(){
+      if(!running && !paused){ // Agar o'yin dastlabki holatda bo'lsa, uni boshlash
+        resetGame();
+        return;
+      }
+      // Agar o'yin tugagan bo'lsa, pauza tugmasi ishlamasligi kerak
+      if (!running && gameOverOverlay.style.display === 'flex') {
+          return;
+      }
+      paused = !paused;
+      stateEl.textContent = paused ? 'Toʻxtatilgan' : 'Oʻynash';
+    }
+
+    // show/hide mobile controls depending on screen width
+    function layoutControls(){
+      const mob = document.getElementById('mobileControls');
+      const desk = document.getElementById('desktopControls');
+      if(window.innerWidth <= 700){ // 700px mobil thresholdi sifatida ishlatildi
+        mob.style.display = 'block';
+        desk.style.display = 'none';
+      } else {
+        mob.style.display = 'none';
+        desk.style.display = 'flex';
+      }
+      resizeCanvas(); // Kontrollar joylashuvi o'zgarganda canvas o'lchamini qayta sozlash
+    }
+    window.addEventListener('resize', layoutControls);
+    layoutControls();
+
+    // initial state setup
+    stateEl.textContent = 'Tayyor'; // Initial state for clarity
+    startOverlay.style.display = 'flex'; // Ensure start button is visible initially
+    gameOverOverlay.style.display = 'none'; // Ensure Game Over overlay is hidden initially
+    requestAnimationFrame(loop);
+
+    // ensure crisp rendering on high-DPI displays
+    function safeScale(){ // attempt to scale safely without breaking grid math
+      const dpr = window.devicePixelRatio || 1;
+      const cssW = COLS * GRID;
+      const cssH = ROWS * GRID;
+      
+      canvas.style.width = cssW + 'px';
+      canvas.style.height = cssH + 'px';
+      
+      canvas.width = cssW * dpr;
+      canvas.height = cssH * dpr;
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+    }
+    safeScale(); // Call once on load, and then again after resizeCanvas
+ 
+  </script>
+</body>
+</html>
